@@ -18,18 +18,27 @@ let progressInterval = null;
    - movie.genre     ← TMDB: genre_ids (mapped to genre names)
    - movie.desc      ← TMDB: overview
    - movie.cast      ← TMDB: credits.cast
+   - movie.poster    ← TMDB: poster_path (real poster image)
    - movie.isNew     ← Custom flag (first 7 trending)
-   ══════════════════════��═══════════════ */
+   ══════════════════════════════════════ */
 function createCard(movie) {
   const card = document.createElement('div');
   card.className = 'movie-card';
 
-  /* Use movie.id to cycle through background colors */
-  const bg = cardBgColors[movie.id % cardBgColors.length];
+  /* Use TMDB poster image if available, fallback to emoji + background color */
+  let posterStyle;
+  if (movie.poster) {
+    /* Real TMDB poster image */
+    posterStyle = `background: linear-gradient(135deg, rgba(0,0,0,.3), rgba(0,0,0,.5)), url('${movie.poster}') center/cover; background-size: cover;`;
+  } else {
+    /* Fallback: emoji + solid color */
+    const bg = cardBgColors[movie.id % cardBgColors.length];
+    posterStyle = `background: ${bg};`;
+  }
 
   card.innerHTML = `
-    <div class="movie-poster" style="background:${bg}">
-      <span>${movie.emoji}</span>
+    <div class="movie-poster" style="${posterStyle}">
+      ${!movie.poster ? `<span>${movie.emoji}</span>` : ''}
       ${movie.isNew ? '<span class="badge-new">NEW</span>' : ''}
       <span class="badge-hd">HD</span>
       <div class="card-overlay">
@@ -102,6 +111,9 @@ function buildRows() {
    Cast:
    - movie.cast ← TMDB: credits.cast (array of actor names)
    
+   Poster:
+   - movie.poster ← TMDB: poster_path (for modal video background)
+   
    Related Movies:
    - Filters by matching genre
    ══════════════════════════════════════ */
@@ -111,6 +123,15 @@ function openModal(movie) {
   
   // Populate emoji from auto-generated genre emoji
   document.getElementById('modalEmoji').textContent  = movie.emoji;
+  
+  /* Set modal video background to poster image or emoji */
+  const modalVideoBg = document.getElementById('modalVideo');
+  if (movie.poster) {
+    modalVideoBg.style.background = `linear-gradient(135deg, rgba(0,0,0,.5), rgba(0,0,0,.8)), url('${movie.poster}') center/cover`;
+    modalVideoBg.style.backgroundSize = 'cover';
+  } else {
+    modalVideoBg.style.background = 'linear-gradient(135deg, #1a1a4e, #2d1b69)';
+  }
   
   // Populate description from TMDB overview
   document.getElementById('modalDesc').textContent   = movie.desc;
@@ -133,14 +154,22 @@ function openModal(movie) {
     .filter(m => m.id !== movie.id && m.genre.some(g => movie.genre.includes(g)))
     .slice(0, 5);
 
-  /* Build related cards */
+  /* Build related cards with poster images */
   const relRow = document.getElementById('relatedRow');
   relRow.innerHTML = '';
   related.forEach(r => {
     const rc = document.createElement('div');
     rc.className = 'related-card';
+    
+    /* Use poster image if available */
+    const relatedBg = r.poster 
+      ? `url('${r.poster}') center/cover` 
+      : '#1a1a2e';
+    
     rc.innerHTML = `
-      <div class="related-thumb" style="background:#1a1a2e">${r.emoji}</div>
+      <div class="related-thumb" style="background: ${relatedBg}">
+        ${!r.poster ? r.emoji : ''}
+      </div>
       <p>${r.title}</p>`;
     rc.addEventListener('click', () => openModal(r));
     relRow.appendChild(rc);

@@ -68,11 +68,12 @@ function formatRuntime(minutes) {
 /* Fetch and transform TMDB data */
 async function fetchTrending() {
   try {
+    console.log('📡 Fetching trending movies from TMDB...');
     const res = await fetch(`${BASE}/trending/movie/week?api_key=${API_KEY}`);
     const data = await res.json();
     
     if (!data.results) {
-      console.error('No results from TMDB');
+      console.error('❌ No results from TMDB');
       return [];
     }
 
@@ -93,10 +94,10 @@ async function fetchTrending() {
       backdrop: tmdbMovie.backdrop_path ? IMG + tmdbMovie.backdrop_path : null
     }));
     
-    console.log(`✓ Loaded ${movies.length} movies from TMDB`);
+    console.log(`✅ Loaded ${movies.length} movies from TMDB`);
     return movies;
   } catch (error) {
-    console.error('Error fetching trending movies:', error);
+    console.error('❌ Error fetching trending movies:', error);
     return [];
   }
 }
@@ -112,31 +113,43 @@ async function enrichMovieData(movieId) {
       cast: data.credits?.cast?.slice(0, 5).map(c => c.name) || []
     };
   } catch (error) {
-    console.error(`Error enriching movie ${movieId}:`, error);
+    console.error(`❌ Error enriching movie ${movieId}:`, error);
     return { duration: '2h 18m', cast: [] };
   }
 }
 
 /* Enrich first N movies with runtime & cast */
 async function enrichMovies(count = 5) {
+  console.log(`⏳ Enriching top ${count} movies with runtime & cast...`);
   for (let i = 0; i < Math.min(count, movies.length); i++) {
     const extra = await enrichMovieData(movies[i].id);
     movies[i].duration = extra.duration;
     movies[i].cast = extra.cast;
   }
+  console.log('✅ Enrichment complete');
 }
 
-/* Initialize: Fetch trending movies */
+/* Initialize: Fetch trending movies and populate display */
 async function initMovies() {
+  console.log('🎬 MovieVerse initializing...');
   await fetchTrending();
-  /* Enrich top 5 with detailed data (runtime, cast) */
   await enrichMovies(5);
+  
+  /* Call buildRows() if it exists (from app.js) */
+  if (typeof buildRows === 'function') {
+    console.log('🎨 Building rows...');
+    buildRows();
+  } else {
+    console.error('❌ buildRows function not found - app.js may not be loaded');
+  }
 }
 
 /* Load on page ready */
 if (document.readyState === 'loading') {
+  console.log('⏳ DOM still loading, waiting for DOMContentLoaded...');
   document.addEventListener('DOMContentLoaded', initMovies);
 } else {
+  console.log('✅ DOM ready, initializing immediately...');
   initMovies();
 }
 

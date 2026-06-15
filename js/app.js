@@ -8,11 +8,23 @@ let progressInterval = null;
 
 /* ══════════════════════════════════════
    CARD BUILDER
-   ══════════════════════════════════════ */
+   TMDB Field Mapping:
+   - movie.id        ← TMDB: id
+   - movie.title     ← TMDB: title
+   - movie.emoji     ← TMDB: genre_ids (auto-mapped to emoji)
+   - movie.rating    ← TMDB: vote_average
+   - movie.year      ← TMDB: release_date
+   - movie.duration  ← TMDB: runtime (formatted as "Xh Ym")
+   - movie.genre     ← TMDB: genre_ids (mapped to genre names)
+   - movie.desc      ← TMDB: overview
+   - movie.cast      ← TMDB: credits.cast
+   - movie.isNew     ← Custom flag (first 7 trending)
+   ══════════════════════��═══════════════ */
 function createCard(movie) {
   const card = document.createElement('div');
   card.className = 'movie-card';
 
+  /* Use movie.id to cycle through background colors */
   const bg = cardBgColors[movie.id % cardBgColors.length];
 
   card.innerHTML = `
@@ -39,21 +51,22 @@ function createCard(movie) {
 
 /* ══════════════════════════════════════
    BUILD ALL ROWS ON LOAD
+   Populates sections from the movies array
    ══════════════════════════════════════ */
 function buildRows() {
-  // Trending — first 7
+  // Trending — first 7 movies
   const trendingRow = document.getElementById('trendingRow');
   movies.slice(0, 7).forEach(m => trendingRow.appendChild(createCard(m)));
 
-  // New Releases
+  // New Releases — movies marked as isNew
   const newGrid = document.getElementById('newGrid');
   movies.filter(m => m.isNew).forEach(m => newGrid.appendChild(createCard(m)));
 
-  // Classics
+  // Classics — movies NOT marked as new
   const classicsRow = document.getElementById('classicsRow');
   movies.filter(m => !m.isNew).forEach(m => classicsRow.appendChild(createCard(m)));
 
-  // Top Picks strip
+  // Top Picks strip — static content from topPicks array
   const strip = document.getElementById('topStrip');
   topPicks.forEach(p => {
     const item = document.createElement('div');
@@ -72,30 +85,55 @@ function buildRows() {
 
 /* ══════════════════════════════════════
    MODAL
+   TMDB Field Mapping in Detail:
+   
+   Title:
+   - movie.title ← TMDB: title
+   
+   Rating & Meta:
+   - movie.rating ← TMDB: vote_average (e.g., "8.7")
+   - movie.year ← TMDB: release_date (extracted as YYYY)
+   - movie.duration ← TMDB: runtime (formatted "Xh Ym")
+   - movie.genre ← TMDB: genre_ids → mapped to genre names
+   
+   Description:
+   - movie.desc ← TMDB: overview
+   
+   Cast:
+   - movie.cast ← TMDB: credits.cast (array of actor names)
+   
+   Related Movies:
+   - Filters by matching genre
    ══════════════════════════════════════ */
 function openModal(movie) {
-  // Populate details
+  // Populate modal title from TMDB title field
   document.getElementById('modalTitle').textContent  = movie.title;
+  
+  // Populate emoji from auto-generated genre emoji
   document.getElementById('modalEmoji').textContent  = movie.emoji;
+  
+  // Populate description from TMDB overview
   document.getElementById('modalDesc').textContent   = movie.desc;
 
+  /* Meta information: rating, year, duration, genres */
   document.getElementById('modalMeta').innerHTML = `
     <span class="rating">★ ${movie.rating}</span>
     <span>${movie.year}</span>
     <span>${movie.duration}</span>
     ${movie.genre.map(g => `<span>${g}</span>`).join('')}`;
 
-  // Cast
+  /* Cast list from TMDB credits */
   const castList = document.getElementById('castList');
   castList.innerHTML = movie.cast
     .map(c => `<span class="cast-chip">${c}</span>`)
     .join('');
 
-  // Related movies (same genre, different film)
+  /* Related movies: find others with matching genre */
   const related = movies
     .filter(m => m.id !== movie.id && m.genre.some(g => movie.genre.includes(g)))
     .slice(0, 5);
 
+  /* Build related cards */
   const relRow = document.getElementById('relatedRow');
   relRow.innerHTML = '';
   related.forEach(r => {
@@ -108,7 +146,7 @@ function openModal(movie) {
     relRow.appendChild(rc);
   });
 
-  // Reset player
+  // Reset player with movie duration from TMDB runtime
   resetPlayer(movie.duration);
 
   // Show overlay
@@ -130,6 +168,7 @@ function handleOverlayClick(e) {
 
 /* ══════════════════════════════════════
    VIDEO PLAYER (mock)
+   Uses movie.duration from TMDB runtime
    ══════════════════════════════════════ */
 function resetPlayer(duration) {
   clearInterval(progressInterval);
@@ -180,13 +219,14 @@ function scrubProgress(e) {
 
 /* ══════════════════════════════════════
    GENRE FILTER
+   Uses movie.genre array from TMDB genre_ids
    ══════════════════════════════════════ */
 function filterGenre(genre, el) {
   // Update active pill
   document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
 
-  // Dim/show cards
+  // Dim/show cards based on movie.genre matching selected genre
   document.querySelectorAll('.movie-card').forEach(card => {
     if (genre === 'All') {
       card.style.opacity        = '1';
@@ -204,6 +244,7 @@ function filterGenre(genre, el) {
 
 /* ══════════════════════════════════════
    SEARCH
+   Searches in movie.title from TMDB title field
    ══════════════════════════════════════ */
 document.getElementById('searchInput').addEventListener('input', function () {
   const query = this.value.toLowerCase().trim();
@@ -229,5 +270,7 @@ document.addEventListener('keydown', e => {
 
 /* ══════════════════════════════════════
    INIT
+   Waits for data.js to load movies array,
+   then builds all rows from TMDB data
    ══════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', buildRows);

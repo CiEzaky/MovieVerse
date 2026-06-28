@@ -8,16 +8,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body data-page="home">
 
   <!-- ══ NAVIGATION ══ -->
   <nav id="navbar">
-    <a class="logo" href="#">Movie<span>Verse</span></a>
+    <a class="logo" href="index.html">Movie<span>Verse</span></a>
     <ul class="nav-links">
-      <li><a href="#" class="active">Home</a></li>
-      <li><a href="#">Movies</a></li>
-      <li><a href="#">TV Shows</a></li>
-      <li><a href="#">My List</a></li>
+      <li><a href="index.html" class="active" data-page="home">Home</a></li>
+      <li><a href="pages/movies.html" data-page="movies">Movies</a></li>
+      <li><a href="pages/tvshows.html" data-page="tvshows">TV Shows</a></li>
+      <li><a href="pages/mylist.html" data-page="mylist">My List</a></li>
     </ul>
     <div class="search-bar">
       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -28,38 +28,40 @@
     <div class="nav-avatar">MV</div>
   </nav>
 
-  <!-- ══ HERO ══ -->
-  <div class="hero">
-    <div class="hero-bg"></div>
-    <div class="hero-poster">
-      <div class="hero-poster-placeholder">🎬</div>
-    </div>
-    <div class="hero-content">
-      <div class="hero-badge">🔥 Trending Now</div>
-      <h1>Echoes of<br>the Abyss</h1>
-      <div class="hero-meta">
-        <span class="hero-rating">★ 8.7</span>
-        <span>2024</span>
-        <span>2h 18m</span>
-        <span>Sci-Fi · Thriller</span>
-      </div>
-      <p class="hero-desc">
-        A deep-space crew discovers a signal older than the universe itself —
-        and something on the other end is listening. A gripping tale of survival,
-        identity, and the unknown.
-      </p>
+  <!-- ══ HERO SLIDESHOW ══ -->
+  <div class="hero" id="hero">
+    <!-- Slides injected by JS -->
+    <div class="hero-slides" id="heroSlides"></div>
+
+    <!-- Gradient overlays -->
+    <div class="hero-overlay-left"></div>
+    <div class="hero-overlay-bottom"></div>
+
+    <!-- Content panel (updated per slide) -->
+    <div class="hero-content" id="heroContent">
+      <div class="hero-badge" id="heroBadge">🔥 Trending Now</div>
+      <h1 id="heroTitle">Loading…</h1>
+      <div class="hero-meta" id="heroMeta"></div>
+      <p class="hero-desc" id="heroDesc">Fetching trending movies…</p>
       <div class="hero-actions">
-        <button class="btn btn-primary" onclick="openModal(movies[0])">▶ Watch Now</button>
-        <button class="btn btn-secondary" onclick="openModal(movies[0])">ℹ More Info</button>
+        <button class="btn btn-primary" id="heroWatchBtn">▶ Watch Now</button>
+        <button class="btn btn-secondary" id="heroInfoBtn">ℹ More Info</button>
       </div>
     </div>
+
+    <!-- Dot indicators -->
+    <div class="hero-dots" id="heroDots"></div>
+
+    <!-- Slide arrows -->
+    <button class="hero-arrow hero-arrow-prev" id="heroPrev" aria-label="Previous">&#8249;</button>
+    <button class="hero-arrow hero-arrow-next" id="heroNext" aria-label="Next">&#8250;</button>
   </div>
 
   <!-- ══ GENRE PILLS ══ -->
   <div class="genre-pills">
     <span class="pill active" onclick="filterGenre('All', this)">All</span>
     <span class="pill" onclick="filterGenre('Action', this)">⚡ Action</span>
-    <span class="pill" onclick="filterGenre('Sci-Fi', this)">🚀 Sci-Fi</span>
+    <span class="pill" onclick="filterGenre('Science Fiction', this)">🚀 Sci-Fi</span>
     <span class="pill" onclick="filterGenre('Drama', this)">🎭 Drama</span>
     <span class="pill" onclick="filterGenre('Thriller', this)">🔪 Thriller</span>
     <span class="pill" onclick="filterGenre('Comedy', this)">😂 Comedy</span>
@@ -71,21 +73,19 @@
   <main>
 
     <!-- ══ FEATURED BANNER ══ -->
-    <div class="featured-banner">
-      <div class="featured-thumb">🏆</div>
-      <div class="featured-info">
+    <div class="featured-banner" id="featuredBanner">
+      <div class="featured-thumb" id="featuredThumb">
+        <div class="featured-thumb-loading">🏆</div>
+      </div>
+      <div class="featured-info" id="featuredInfo">
         <div class="tag-list">
           <span class="tag">EDITOR'S PICK</span>
           <span class="tag">4K</span>
         </div>
-        <h3>The Iron Meridian</h3>
-        <p>An aging war veteran discovers his country's darkest secret buried beneath a mountain — and must choose between loyalty and truth.</p>
-        <div class="tag-list">
-          <span class="tag">War</span>
-          <span class="tag">Drama</span>
-          <span class="tag">Based on True Events</span>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="openModal(movies[4])">▶ Watch Now</button>
+        <h3 id="featuredTitle">Loading…</h3>
+        <p id="featuredDesc">Fetching featured movie…</p>
+        <div class="tag-list" id="featuredTags"></div>
+        <button class="btn btn-primary btn-sm" id="featuredWatchBtn">▶ Watch Now</button>
       </div>
     </div>
 
@@ -93,9 +93,11 @@
     <section>
       <div class="section-header">
         <h2 class="section-title">🔥 <span>Trending</span> This Week</h2>
-        <a href="#" class="see-all">See all →</a>
+        <a href="pages/movies.html" class="see-all">See all →</a>
       </div>
-      <div class="movie-row" id="trendingRow"></div>
+      <div class="movie-row" id="trendingRow">
+        <div class="row-loading">Loading movies…</div>
+      </div>
     </section>
 
     <!-- ══ TOP PICKS STRIP ══ -->
@@ -110,7 +112,7 @@
     <section>
       <div class="section-header">
         <h2 class="section-title">🆕 <span>New</span> Releases</h2>
-        <a href="#" class="see-all">See all →</a>
+        <a href="pages/movies.html?filter=new" class="see-all">See all →</a>
       </div>
       <div class="movie-grid" id="newGrid"></div>
     </section>
@@ -119,7 +121,7 @@
     <section>
       <div class="section-header">
         <h2 class="section-title">🏛 <span>All-Time</span> Classics</h2>
-        <a href="#" class="see-all">See all →</a>
+        <a href="pages/movies.html?filter=classics" class="see-all">See all →</a>
       </div>
       <div class="movie-row" id="classicsRow"></div>
     </section>
@@ -131,7 +133,6 @@
     <div class="modal" id="modal">
       <button class="modal-close" onclick="closeModal()">✕</button>
 
-      <!-- Video Player -->
       <div class="modal-video" id="modalVideo">
         <div class="modal-video-bg" id="modalEmoji">🎬</div>
         <div class="modal-video-fade"></div>
@@ -144,19 +145,16 @@
             <button class="ctrl-btn" title="Skip back">⏮</button>
             <button class="ctrl-btn" title="Skip forward">⏭</button>
             <span class="time-display" id="timeDisplay">0:00 / 2:18:00</span>
-            <div class="volume-slider">
-              <div class="volume-fill"></div>
-            </div>
+            <div class="volume-slider"><div class="volume-fill"></div></div>
             <div class="ctrl-right">
               <button class="ctrl-btn" title="Subtitles">CC</button>
               <button class="ctrl-btn" title="Settings">⚙</button>
-              <button class="ctrl-btn" title="Fullscreen">⛶</button>
+              <button class="ctrl-btn" onclick="addToMyList()" id="listBtn" title="Add to My List">♡</button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Movie Details -->
       <div class="modal-body">
         <h2 class="modal-title" id="modalTitle">—</h2>
         <div class="modal-meta" id="modalMeta"></div>
@@ -176,11 +174,11 @@
   <!-- ══ FOOTER ══ -->
   <footer>
     <div class="footer-logo">MovieVerse</div>
-    <p>Demo Mode — Connect a TMDB API key for real movies.</p>
+    <p>Powered by TMDB API · Real movies, real data</p>
     <p>© 2024 MovieVerse. For demonstration purposes only.</p>
   </footer>
 
-  <!-- Scripts loaded in correct order: app.js first, then data.js -->
+  <script src="js/mylist.js"></script>
   <script src="js/app.js"></script>
   <script src="js/data.js"></script>
 </body>

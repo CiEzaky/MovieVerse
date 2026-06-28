@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TV Shows – MovieVerse</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body data-page="tvshows">
+
+  <nav id="navbar">
+    <a class="logo" href="../index.html">Movie<span>Verse</span></a>
+    <ul class="nav-links">
+      <li><a href="../index.html">Home</a></li>
+      <li><a href="movies.html">Movies</a></li>
+      <li><a href="tvshows.html" class="active">TV Shows</a></li>
+      <li><a href="mylist.html">My List</a></li>
+    </ul>
+    <div class="search-bar">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input type="text" placeholder="Search TV shows…" id="searchInput">
+    </div>
+    <div class="nav-avatar">MV</div>
+  </nav>
+
+  <div class="page-header">
+    <h1 class="page-title">📺 <span>TV Shows</span></h1>
+    <p class="page-sub">Binge-worthy series, trending now and fan favourites</p>
+  </div>
+
+  <div class="filter-bar">
+    <div class="genre-pills" style="padding:0;flex:1;">
+      <span class="pill active" onclick="filterGenre('All', this)">All</span>
+      <span class="pill" onclick="filterGenre('Drama', this)">🎭 Drama</span>
+      <span class="pill" onclick="filterGenre('Comedy', this)">😂 Comedy</span>
+      <span class="pill" onclick="filterGenre('Crime', this)">🔫 Crime</span>
+      <span class="pill" onclick="filterGenre('Action & Adventure', this)">⚡ Action</span>
+      <span class="pill" onclick="filterGenre('Sci-Fi & Fantasy', this)">🚀 Sci-Fi</span>
+      <span class="pill" onclick="filterGenre('Mystery', this)">🔍 Mystery</span>
+      <span class="pill" onclick="filterGenre('Animation', this)">✨ Animation</span>
+    </div>
+    <select class="sort-select" id="sortSelect" onchange="sortShows(this.value)">
+      <option value="trending">Trending</option>
+      <option value="rating">Top Rated</option>
+    </select>
+  </div>
+
+  <main>
+    <div class="page-loading" id="pageLoading">
+      <div class="spinner"></div>
+      <p>Loading shows from TMDB…</p>
+    </div>
+
+    <!-- On Air Now strip -->
+    <section id="onAirSection" style="display:none">
+      <div class="section-header">
+        <h2 class="section-title">🔴 <span>On Air</span> Now</h2>
+      </div>
+      <div class="movie-row" id="onAirRow"></div>
+    </section>
+
+    <section>
+      <div class="section-header">
+        <h2 class="section-title">📺 <span>All</span> Shows</h2>
+      </div>
+      <div class="movie-grid wide-grid" id="showsGrid"></div>
+    </section>
+
+    <div class="load-more-wrap">
+      <button class="btn btn-secondary" id="loadMoreBtn" onclick="loadMore()" style="display:none">Load More</button>
+    </div>
+  </main>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+    <div class="modal" id="modal">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-video" id="modalVideo">
+        <div class="modal-video-bg" id="modalEmoji">📺</div>
+        <div class="modal-video-fade"></div>
+        <div class="video-player-mock">
+          <div class="progress-bar" onclick="scrubProgress(event)">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="player-controls">
+            <button class="ctrl-btn" onclick="togglePlay()" id="playBtn">▶</button>
+            <button class="ctrl-btn">⏮</button>
+            <button class="ctrl-btn">⏭</button>
+            <span class="time-display" id="timeDisplay">0:00 / 45:00</span>
+            <div class="volume-slider"><div class="volume-fill"></div></div>
+            <div class="ctrl-right">
+              <button class="ctrl-btn">CC</button>
+              <button class="ctrl-btn">⚙</button>
+              <button class="ctrl-btn" onclick="addToMyList()" id="listBtn">♡</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-body">
+        <h2 class="modal-title" id="modalTitle">—</h2>
+        <div class="modal-meta" id="modalMeta"></div>
+        <p class="modal-desc" id="modalDesc">—</p>
+        <div class="modal-cast"><h4>Cast</h4><div class="cast-list" id="castList"></div></div>
+        <div class="related-section"><h4>More Like This</h4><div class="related-row" id="relatedRow"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo">MovieVerse</div>
+    <p>Powered by TMDB · © 2024 MovieVerse</p>
+  </footer>
+
+  <script src="../js/mylist.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    let allShows = [];
+    let currentPage = 1;
+    const API_KEY = '01c8e1e1519b1ef75d38e910d2d62a0e';
+    const BASE = 'https://api.themoviedb.org/3';
+    const IMG = 'https://image.tmdb.org/t/p/w500';
+
+    const TV_GENRE_MAP = {10759:'Action & Adventure',16:'Animation',35:'Comedy',80:'Crime',99:'Documentary',18:'Drama',10751:'Family',10762:'Kids',9648:'Mystery',10763:'News',10764:'Reality',10765:'Sci-Fi & Fantasy',10766:'Soap',10767:'Talk',10768:'War & Politics',37:'Western'};
+    const EMOJI_MAP = {'Drama':'🎭','Comedy':'😂','Crime':'🔫','Action & Adventure':'⚡','Sci-Fi & Fantasy':'🚀','Mystery':'🔍','Animation':'✨','Horror':'👻','Default':'📺'};
+
+    function mapShow(s, i) {
+      const genres = (s.genre_ids || []).map(id => TV_GENRE_MAP[id]).filter(Boolean);
+      return {
+        id: s.id, title: s.name || 'Unknown',
+        emoji: EMOJI_MAP[genres[0]] || '📺',
+        rating: (s.vote_average || 0).toFixed(1),
+        year: s.first_air_date ? new Date(s.first_air_date).getFullYear() : 'N/A',
+        duration: '45m',
+        genre: genres, desc: s.overview || '',
+        cast: [], isNew: i < 7,
+        poster: s.poster_path ? IMG + s.poster_path : null,
+        backdrop: s.backdrop_path ? `https://image.tmdb.org/t/p/w1280${s.backdrop_path}` : null,
+        isTV: true
+      };
+    }
+
+    async function loadShows(endpoint, page = 1) {
+      const res = await fetch(`${BASE}/${endpoint}?api_key=${API_KEY}&page=${page}`);
+      const data = await res.json();
+      return (data.results || []).map(mapShow);
+    }
+
+    function renderShows(showList, gridId) {
+      const grid = document.getElementById(gridId);
+      showList.forEach(s => grid.appendChild(createCard(s)));
+    }
+
+    function filterGenre(genre, el) {
+      document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      const grid = document.getElementById('showsGrid');
+      grid.innerHTML = '';
+      const filtered = genre === 'All' ? allShows : allShows.filter(s => s.genre.includes(genre));
+      movies = filtered;
+      renderShows(filtered, 'showsGrid');
+    }
+
+    function sortShows(by) {
+      const grid = document.getElementById('showsGrid');
+      grid.innerHTML = '';
+      let sorted = [...allShows];
+      if (by === 'rating') sorted.sort((a, b) => b.rating - a.rating);
+      movies = sorted;
+      renderShows(sorted, 'showsGrid');
+    }
+
+    async function loadMore() {
+      currentPage++;
+      const more = await loadShows('trending/tv/week', currentPage);
+      allShows = allShows.concat(more);
+      movies = allShows;
+      renderShows(more, 'showsGrid');
+    }
+
+    async function initTVPage() {
+      document.getElementById('pageLoading').style.display = 'flex';
+      const [trending, onAir, p2] = await Promise.all([
+        loadShows('trending/tv/week', 1),
+        loadShows('tv/on_the_air', 1),
+        loadShows('trending/tv/week', 2)
+      ]);
+
+      // On Air strip
+      const onAirSection = document.getElementById('onAirSection');
+      onAirSection.style.display = 'block';
+      onAir.slice(0, 8).forEach(s => {
+        movies = onAir;
+        document.getElementById('onAirRow').appendChild(createCard(s));
+      });
+
+      allShows = [...trending, ...p2];
+      movies = allShows;
+      document.getElementById('pageLoading').style.display = 'none';
+      renderShows(allShows, 'showsGrid');
+      document.getElementById('loadMoreBtn').style.display = 'block';
+    }
+
+    document.addEventListener('DOMContentLoaded', initTVPage);
+    document.getElementById('searchInput').addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      document.querySelectorAll('.movie-card').forEach(c => {
+        const t = c.querySelector('.movie-title')?.textContent.toLowerCase() || '';
+        c.style.opacity = (!q || t.includes(q)) ? '1' : '0.15';
+      });
+    });
+  </script>
+</body>
+</html>

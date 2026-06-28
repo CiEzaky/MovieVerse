@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My List – MovieVerse</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body data-page="mylist">
+
+  <nav id="navbar">
+    <a class="logo" href="../index.html">Movie<span>Verse</span></a>
+    <ul class="nav-links">
+      <li><a href="../index.html">Home</a></li>
+      <li><a href="movies.html">Movies</a></li>
+      <li><a href="tvshows.html">TV Shows</a></li>
+      <li><a href="mylist.html" class="active">My List</a></li>
+    </ul>
+    <div class="search-bar">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input type="text" placeholder="Search your list…" id="searchInput">
+    </div>
+    <div class="nav-avatar">MV</div>
+  </nav>
+
+  <div class="page-header">
+    <h1 class="page-title">♡ <span>My List</span></h1>
+    <p class="page-sub" id="listCount">0 titles saved</p>
+  </div>
+
+  <main>
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState" style="display:none">
+      <div class="empty-icon">🎬</div>
+      <h2>Your list is empty</h2>
+      <p>Tap ♡ on any movie or show to save it here.</p>
+      <a href="../index.html" class="btn btn-primary" style="display:inline-block;margin-top:1.2rem">Browse Movies</a>
+    </div>
+
+    <div class="movie-grid wide-grid" id="myListGrid"></div>
+  </main>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+    <div class="modal" id="modal">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-video" id="modalVideo">
+        <div class="modal-video-bg" id="modalEmoji">🎬</div>
+        <div class="modal-video-fade"></div>
+        <div class="video-player-mock">
+          <div class="progress-bar" onclick="scrubProgress(event)">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="player-controls">
+            <button class="ctrl-btn" onclick="togglePlay()" id="playBtn">▶</button>
+            <button class="ctrl-btn">⏮</button>
+            <button class="ctrl-btn">⏭</button>
+            <span class="time-display" id="timeDisplay">0:00 / 2:18:00</span>
+            <div class="volume-slider"><div class="volume-fill"></div></div>
+            <div class="ctrl-right">
+              <button class="ctrl-btn">CC</button>
+              <button class="ctrl-btn">⚙</button>
+              <button class="ctrl-btn" onclick="addToMyList()" id="listBtn">♡</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-body">
+        <h2 class="modal-title" id="modalTitle">—</h2>
+        <div class="modal-meta" id="modalMeta"></div>
+        <p class="modal-desc" id="modalDesc">—</p>
+        <div class="modal-cast"><h4>Cast</h4><div class="cast-list" id="castList"></div></div>
+        <div class="related-section"><h4>More Like This</h4><div class="related-row" id="relatedRow"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo">MovieVerse</div>
+    <p>Powered by TMDB · © 2024 MovieVerse</p>
+  </footer>
+
+  <script src="../js/mylist.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    let movies = [];
+
+    function renderMyList() {
+      const list = getMyList();
+      const grid = document.getElementById('myListGrid');
+      const empty = document.getElementById('emptyState');
+      const count = document.getElementById('listCount');
+
+      grid.innerHTML = '';
+      count.textContent = `${list.length} title${list.length !== 1 ? 's' : ''} saved`;
+
+      if (list.length === 0) {
+        empty.style.display = 'flex';
+        return;
+      }
+      empty.style.display = 'none';
+      movies = list;
+      list.forEach(m => {
+        const card = createCard(m);
+        // Add remove button
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-from-list';
+        removeBtn.textContent = '✕';
+        removeBtn.title = 'Remove from list';
+        removeBtn.onclick = (e) => {
+          e.stopPropagation();
+          removeFromMyList(m.id);
+          renderMyList();
+        };
+        card.querySelector('.movie-poster').appendChild(removeBtn);
+        grid.appendChild(card);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', renderMyList);
+    document.getElementById('searchInput').addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      document.querySelectorAll('.movie-card').forEach(c => {
+        const t = c.querySelector('.movie-title')?.textContent.toLowerCase() || '';
+        c.style.opacity = (!q || t.includes(q)) ? '1' : '0.15';
+      });
+    });
+  </script>
+</body>
+</html>

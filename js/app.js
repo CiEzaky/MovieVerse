@@ -1,40 +1,35 @@
 /* ══════════════════════════════════════
-   MovieVerse — app.js
+   MovieVerse — app.js  (v2)
    ══════════════════════════════════════ */
 
 /* ── State ── */
 let playing = false;
 let progressInterval = null;
+let currentMovie = null;
+
+/* Hero slideshow state */
+let heroMovies = [];
+let heroIndex  = 0;
+let heroTimer  = null;
 
 /* ══════════════════════════════════════
    CARD BUILDER
-   TMDB Field Mapping:
-   - movie.id        ← TMDB: id
-   - movie.title     ← TMDB: title
-   - movie.emoji     ← TMDB: genre_ids (auto-mapped to emoji)
-   - movie.rating    ← TMDB: vote_average
-   - movie.year      ← TMDB: release_date
-   - movie.duration  ← TMDB: runtime (formatted as "Xh Ym")
-   - movie.genre     ← TMDB: genre_ids (mapped to genre names)
-   - movie.desc      ← TMDB: overview
-   - movie.cast      ← TMDB: credits.cast
-   - movie.poster    ← TMDB: poster_path (real poster image)
-   - movie.isNew     ← Custom flag (first 7 trending)
    ══════════════════════════════════════ */
+const cardBgColors = ['#1a0a2e','#0d1b2e','#1a0a0a','#0a1a0a','#1a1a0a','#1a0a1a'];
+
 function createCard(movie) {
   const card = document.createElement('div');
   card.className = 'movie-card';
 
-  /* Use TMDB poster image if available, fallback to emoji + background color */
   let posterStyle;
   if (movie.poster) {
-    /* Real TMDB poster image */
-    posterStyle = `background: linear-gradient(135deg, rgba(0,0,0,.3), rgba(0,0,0,.5)), url('${movie.poster}') center/cover; background-size: cover;`;
+    posterStyle = `background: url('${movie.poster}') center/cover;`;
   } else {
-    /* Fallback: emoji + solid color */
     const bg = cardBgColors[movie.id % cardBgColors.length];
     posterStyle = `background: ${bg};`;
   }
+
+  const inList = typeof isInMyList === 'function' && isInMyList(movie.id);
 
   card.innerHTML = `
     <div class="movie-poster" style="${posterStyle}">
@@ -59,115 +54,220 @@ function createCard(movie) {
 }
 
 /* ══════════════════════════════════════
-   BUILD ALL ROWS ON LOAD
-   Populates sections from the movies array
+   HERO SLIDESHOW
+   ══════════════════════════════════════ */
+function initHero(movieList) {
+  heroMovies = movieList.slice(0, 8);
+  heroIndex = 0;
+
+  const slidesEl = document.getElementById('heroSlides');
+  const dotsEl   = document.getElementById('heroDots');
+  if (!slidesEl || !dotsEl) return;
+
+  /* Build slides */
+  slidesEl.innerHTML = '';
+  dotsEl.innerHTML   = '';
+
+  heroMovies.forEach((m, i) => {
+    const slide = document.createElement('div');
+    slide.className = 'hero-slide' + (i === 0 ? ' active' : '');
+    if (m.backdrop || m.poster) {
+      slide.style.backgroundImage = `url('${m.backdrop || m.poster}')`;
+    }
+    slidesEl.appendChild(slide);
+
+    const dot = document.createElement('button');
+    dot.className = 'hero-dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', `Slide ${i + 1}`);
+    dot.addEventListener('click', () => goToSlide(i));
+    dotsEl.appendChild(dot);
+  });
+
+  renderHeroContent(0);
+  startHeroAutoplay();
+
+  document.getElementById('heroPrev')?.addEventListener('click', () => stepHero(-1));
+  document.getElementById('heroNext')?.addEventListener('click', () => stepHero(1));
+}
+
+function renderHeroContent(index) {
+  const m = heroMovies[index];
+  if (!m) return;
+
+  const titleEl = document.getElementById('heroTitle');
+  const metaEl  = document.getElementById('heroMeta');
+  const descEl  = document.getElementById('heroDesc');
+  const watchBtn = document.getElementById('heroWatchBtn');
+  const infoBtn  = document.getElementById('heroInfoBtn');
+
+  if (titleEl) titleEl.textContent = m.title;
+  if (metaEl)  metaEl.innerHTML = `
+    <span class="hero-rating">★ ${m.rating}</span>
+    <span>${m.year}</span>
+    <span>${m.duration}</span>
+    <span>${(m.genre || []).slice(0, 2).join(' · ')}</span>`;
+  if (descEl) descEl.textContent = m.desc?.slice(0, 220) + (m.desc?.length > 220 ? '…' : '') || '';
+  if (watchBtn) watchBtn.onclick = () => openModal(m);
+  if (infoBtn)  infoBtn.onclick  = () => openModal(m);
+}
+
+function goToSlide(index) {
+  const slides = document.querySelectorAll('.hero-slide');
+  const dots   = document.querySelectorAll('.hero-dot');
+
+  slides[heroIndex]?.classList.remove('active');
+  dots[heroIndex]?.classList.remove('active');
+
+  heroIndex = (index + heroMovies.length) % heroMovies.length;
+
+  slides[heroIndex]?.classList.add('active');
+  dots[heroIndex]?.classList.add('active');
+
+  renderHeroContent(heroIndex);
+}
+
+function stepHero(dir) {
+  clearTimeout(heroTimer);
+  goToSlide(heroIndex + dir);
+  startHeroAutoplay();
+}
+
+function startHeroAutoplay() {
+  clearTimeout(heroTimer);
+  heroTimer = setTimeout(() => {
+    goToSlide(heroIndex + 1);
+    startHeroAutoplay();
+  }, 6000);
+}
+
+/* ══════════════════════════════════════
+   FEATURED BANNER (live from TMDB)
+   ══════════════════════════════════════ */
+function renderFeaturedBanner(movie) {
+  const thumbEl    = document.getElementById('featuredThumb');
+  const titleEl    = document.getElementById('featuredTitle');
+  const descEl     = document.getElementById('featuredDesc');
+  const tagsEl     = document.getElementById('featuredTags');
+  const watchBtn   = document.getElementById('featuredWatchBtn');
+  if (!thumbEl) return;
+
+  if (movie.poster) {
+    thumbEl.style.backgroundImage = `url('${movie.poster}')`;
+    thumbEl.style.backgroundSize = 'cover';
+    thumbEl.style.backgroundPosition = 'center';
+    thumbEl.innerHTML = '';
+  }
+  if (titleEl) titleEl.textContent = movie.title;
+  if (descEl)  descEl.textContent  = movie.desc?.slice(0, 180) + (movie.desc?.length > 180 ? '…' : '') || '';
+  if (tagsEl)  tagsEl.innerHTML    = (movie.genre || []).map(g => `<span class="tag">${g}</span>`).join('');
+  if (watchBtn) watchBtn.onclick   = () => openModal(movie);
+}
+
+/* ══════════════════════════════════════
+   BUILD ALL ROWS ON LOAD (Home page)
    ══════════════════════════════════════ */
 function buildRows() {
-  // Trending — first 7 movies
+  if (!window.movies || !movies.length) return;
+
+  /* Hero slideshow — top 8 trending */
+  initHero(movies);
+
+  /* Featured banner — pick movie with high rating that isn't #1 hero */
+  const featured = movies.slice(3, 10).find(m => parseFloat(m.rating) >= 7) || movies[4];
+  if (featured) renderFeaturedBanner(featured);
+
+  /* Trending row — first 8 */
   const trendingRow = document.getElementById('trendingRow');
-  movies.slice(0, 7).forEach(m => trendingRow.appendChild(createCard(m)));
+  if (trendingRow) {
+    trendingRow.innerHTML = '';
+    movies.slice(0, 8).forEach(m => trendingRow.appendChild(createCard(m)));
+  }
 
-  // New Releases — movies marked as isNew
+  /* New Releases grid */
   const newGrid = document.getElementById('newGrid');
-  movies.filter(m => m.isNew).forEach(m => newGrid.appendChild(createCard(m)));
+  if (newGrid) {
+    newGrid.innerHTML = '';
+    movies.filter(m => m.isNew).forEach(m => newGrid.appendChild(createCard(m)));
+  }
 
-  // Classics — movies NOT marked as new
+  /* Classics row */
   const classicsRow = document.getElementById('classicsRow');
-  movies.filter(m => !m.isNew).forEach(m => classicsRow.appendChild(createCard(m)));
+  if (classicsRow) {
+    classicsRow.innerHTML = '';
+    movies.filter(m => !m.isNew).slice(0, 10).forEach(m => classicsRow.appendChild(createCard(m)));
+  }
 
-  // Top Picks strip — static content from topPicks array
+  /* Top Picks strip — real TMDB posters */
   const strip = document.getElementById('topStrip');
-  topPicks.forEach(p => {
-    const item = document.createElement('div');
-    item.className = 'top-item';
-    item.style.background = p.bg;
-    item.innerHTML = `
-      <div class="top-item-bg">${p.emoji}</div>
-      <div class="top-item-overlay">
-        <h3>${p.title}</h3>
-        <p>${p.sub}</p>
-      </div>`;
-    item.addEventListener('click', () => openModal(movies[p.movieIndex]));
-    strip.appendChild(item);
-  });
+  if (strip) {
+    strip.innerHTML = '';
+    const picks = movies.slice(8, 14);
+    picks.forEach(m => {
+      const item = document.createElement('div');
+      item.className = 'top-item';
+      if (m.backdrop || m.poster) {
+        item.style.backgroundImage = `url('${m.backdrop || m.poster}')`;
+        item.style.backgroundSize = 'cover';
+        item.style.backgroundPosition = 'center';
+      } else {
+        item.style.background = '#1a0a2e';
+      }
+      item.innerHTML = `
+        <div class="top-item-overlay">
+          <h3>${m.title}</h3>
+          <p>${(m.genre || []).slice(0,2).join(' · ')} · ${m.year}</p>
+        </div>`;
+      item.addEventListener('click', () => openModal(m));
+      strip.appendChild(item);
+    });
+  }
 }
 
 /* ══════════════════════════════════════
    MODAL
-   TMDB Field Mapping in Detail:
-   
-   Title:
-   - movie.title ← TMDB: title
-   
-   Rating & Meta:
-   - movie.rating ← TMDB: vote_average (e.g., "8.7")
-   - movie.year ← TMDB: release_date (extracted as YYYY)
-   - movie.duration ← TMDB: runtime (formatted "Xh Ym")
-   - movie.genre ← TMDB: genre_ids → mapped to genre names
-   
-   Description:
-   - movie.desc ← TMDB: overview
-   
-   Cast:
-   - movie.cast ← TMDB: credits.cast (array of actor names)
-   
-   Poster:
-   - movie.poster ← TMDB: poster_path (for modal video background)
-   
-   Related Movies:
-   - Filters by matching genre
    ══════════════════════════════════════ */
 function openModal(movie) {
-  // Populate modal title from TMDB title field
-  document.getElementById('modalTitle').textContent  = movie.title;
-  
-  // Populate emoji from auto-generated genre emoji
-  document.getElementById('modalEmoji').textContent  = movie.emoji;
-  
-  /* Set modal video background to poster image or emoji */
-  const modalVideoBg = document.getElementById('modalVideo');
-  if (movie.poster) {
-    modalVideoBg.style.background = `linear-gradient(135deg, rgba(0,0,0,.5), rgba(0,0,0,.8)), url('${movie.poster}') center/cover`;
-    modalVideoBg.style.backgroundSize = 'cover';
-  } else {
-    modalVideoBg.style.background = 'linear-gradient(135deg, #1a1a4e, #2d1b69)';
-  }
-  
-  // Populate description from TMDB overview
-  document.getElementById('modalDesc').textContent   = movie.desc;
+  currentMovie = movie;
 
-  /* Meta information: rating, year, duration, genres */
+  document.getElementById('modalTitle').textContent = movie.title;
+  document.getElementById('modalEmoji').textContent = movie.emoji || '🎬';
+  document.getElementById('modalDesc').textContent  = movie.desc || '';
+
+  const modalVideoBg = document.getElementById('modalVideo');
+  if (movie.backdrop || movie.poster) {
+    modalVideoBg.style.backgroundImage = `url('${movie.backdrop || movie.poster}')`;
+    modalVideoBg.style.backgroundSize  = 'cover';
+    modalVideoBg.style.backgroundPosition = 'center';
+  } else {
+    modalVideoBg.style.backgroundImage = '';
+    modalVideoBg.style.background = 'linear-gradient(135deg,#1a1a4e,#2d1b69)';
+  }
+
   document.getElementById('modalMeta').innerHTML = `
     <span class="rating">★ ${movie.rating}</span>
     <span>${movie.year}</span>
     <span>${movie.duration}</span>
-    ${movie.genre.map(g => `<span>${g}</span>`).join('')}`;
+    ${(movie.genre || []).map(g => `<span>${g}</span>`).join('')}`;
 
-  /* Cast list from TMDB credits */
   const castList = document.getElementById('castList');
-  castList.innerHTML = movie.cast
-    .map(c => `<span class="cast-chip">${c}</span>`)
-    .join('');
+  if (movie.cast && movie.cast.length) {
+    castList.innerHTML = movie.cast.map(c => `<span class="cast-chip">${c}</span>`).join('');
+  } else {
+    castList.innerHTML = '<span class="cast-chip" style="opacity:.4">Loading cast…</span>';
+  }
 
-  /* Related movies: find others with matching genre */
-  const related = movies
-    .filter(m => m.id !== movie.id && m.genre.some(g => movie.genre.includes(g)))
-    .slice(0, 5);
-
-  /* Build related cards with poster images */
+  /* Related */
   const relRow = document.getElementById('relatedRow');
   relRow.innerHTML = '';
+  const allM = window.movies || [];
+  const related = allM
+    .filter(m => m.id !== movie.id && (m.genre || []).some(g => (movie.genre || []).includes(g)))
+    .slice(0, 5);
   related.forEach(r => {
     const rc = document.createElement('div');
     rc.className = 'related-card';
-    
-    /* Use poster image if available */
-    const relatedBg = r.poster 
-      ? `url('${r.poster}') center/cover` 
-      : '#1a1a2e';
-    
     rc.innerHTML = `
-      <div class="related-thumb" style="background: ${relatedBg}">
+      <div class="related-thumb" style="${r.poster ? `background:url('${r.poster}') center/cover` : 'background:#1a1a2e'}">
         ${!r.poster ? r.emoji : ''}
       </div>
       <p>${r.title}</p>`;
@@ -175,12 +275,36 @@ function openModal(movie) {
     relRow.appendChild(rc);
   });
 
-  // Reset player with movie duration from TMDB runtime
-  resetPlayer(movie.duration);
+  /* My List button state */
+  updateListBtn();
 
-  // Show overlay
+  resetPlayer(movie.duration);
   document.getElementById('modalOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+}
+
+function updateListBtn() {
+  const btn = document.getElementById('listBtn');
+  if (!btn || !currentMovie) return;
+  const inList = typeof isInMyList === 'function' && isInMyList(currentMovie.id);
+  btn.textContent = inList ? '♥' : '♡';
+  btn.title = inList ? 'Remove from My List' : 'Add to My List';
+  btn.style.color = inList ? 'var(--accent)' : '';
+}
+
+function addToMyList() {
+  if (!currentMovie || typeof toggleMyList !== 'function') return;
+  const added = toggleMyList(currentMovie);
+  updateListBtn();
+  updateMyListBadge();
+
+  /* Toast */
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = added ? `Added "${currentMovie.title}" to My List` : `Removed from My List`;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 2200);
 }
 
 function closeModal() {
@@ -197,43 +321,28 @@ function handleOverlayClick(e) {
 
 /* ══════════════════════════════════════
    VIDEO PLAYER (mock)
-   Uses movie.duration from TMDB runtime
    ══════════════════════════════════════ */
 function resetPlayer(duration) {
   clearInterval(progressInterval);
   playing = false;
   document.getElementById('progressFill').style.width = '3%';
-  document.getElementById('timeDisplay').textContent  = `0:00 / ${duration}`;
+  document.getElementById('timeDisplay').textContent  = `0:00 / ${duration || '2:18:00'}`;
   document.getElementById('playBtn').textContent       = '▶';
 }
 
 function togglePlay() {
   playing = !playing;
   document.getElementById('playBtn').textContent = playing ? '⏸' : '▶';
-
   if (playing) {
     progressInterval = setInterval(() => {
       const fill    = document.getElementById('progressFill');
       const current = parseFloat(fill.style.width) || 3;
-
-      if (current >= 100) {
-        clearInterval(progressInterval);
-        playing = false;
-        document.getElementById('playBtn').textContent = '▶';
-        return;
-      }
-
+      if (current >= 100) { clearInterval(progressInterval); playing = false; document.getElementById('playBtn').textContent = '▶'; return; }
       const next = Math.min(current + 0.08, 100);
       fill.style.width = next + '%';
-
-      // Update time display
-      const totalSecs = 138 * 60; // 2h 18m default
+      const totalSecs = 138 * 60;
       const elapsed   = Math.floor((next / 100) * totalSecs);
-      const mins      = Math.floor(elapsed / 60);
-      const secs      = elapsed % 60;
-      document.getElementById('timeDisplay').textContent =
-        `${mins}:${secs.toString().padStart(2, '0')} / 2:18:00`;
-
+      document.getElementById('timeDisplay').textContent = `${Math.floor(elapsed/60)}:${(elapsed%60).toString().padStart(2,'0')} / 2:18:00`;
     }, 100);
   } else {
     clearInterval(progressInterval);
@@ -241,65 +350,48 @@ function togglePlay() {
 }
 
 function scrubProgress(e) {
-  const bar = e.currentTarget;
-  const pct = (e.offsetX / bar.offsetWidth) * 100;
+  const pct = (e.offsetX / e.currentTarget.offsetWidth) * 100;
   document.getElementById('progressFill').style.width = Math.max(0, Math.min(100, pct)) + '%';
 }
 
 /* ══════════════════════════════════════
    GENRE FILTER
-   Uses movie.genre array from TMDB genre_ids
    ══════════════════════════════════════ */
 function filterGenre(genre, el) {
-  // Update active pill
   document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
-
-  // Dim/show cards based on movie.genre matching selected genre
   document.querySelectorAll('.movie-card').forEach(card => {
-    if (genre === 'All') {
-      card.style.opacity        = '1';
-      card.style.pointerEvents  = '';
-      return;
-    }
+    if (genre === 'All') { card.style.opacity = '1'; card.style.pointerEvents = ''; return; }
     const titleEl = card.querySelector('.movie-title');
     if (!titleEl) return;
-    const movie = movies.find(m => m.title === titleEl.textContent);
-    const match = movie && movie.genre.includes(genre);
+    const movie = (window.movies || []).find(m => m.title === titleEl.textContent);
+    const match = movie && (movie.genre || []).includes(genre);
     card.style.opacity       = match ? '1' : '0.2';
     card.style.pointerEvents = match ? '' : 'none';
   });
 }
 
 /* ══════════════════════════════════════
-   SEARCH
-   Searches in movie.title from TMDB title field
+   SEARCH (Home page)
    ══════════════════════════════════════ */
-document.getElementById('searchInput').addEventListener('input', function () {
-  const query = this.value.toLowerCase().trim();
-
-  document.querySelectorAll('.movie-card').forEach(card => {
-    const titleEl = card.querySelector('.movie-title');
-    if (!titleEl) return;
-    const title = titleEl.textContent.toLowerCase();
-    card.style.opacity = (!query || title.includes(query)) ? '1' : '0.15';
+const searchEl = document.getElementById('searchInput');
+if (searchEl && document.querySelector('[data-page="home"]')) {
+  searchEl.addEventListener('input', function() {
+    const query = this.value.toLowerCase().trim();
+    document.querySelectorAll('.movie-card').forEach(card => {
+      const titleEl = card.querySelector('.movie-title');
+      if (!titleEl) return;
+      card.style.opacity = (!query || titleEl.textContent.toLowerCase().includes(query)) ? '1' : '0.15';
+    });
   });
-});
+}
 
 /* ══════════════════════════════════════
-   KEYBOARD SHORTCUTS
+   KEYBOARD
    ══════════════════════════════════════ */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
-  if (e.key === ' ' && document.getElementById('modalOverlay').classList.contains('open')) {
-    e.preventDefault();
-    togglePlay();
+  if (e.key === ' ' && document.getElementById('modalOverlay')?.classList.contains('open')) {
+    e.preventDefault(); togglePlay();
   }
 });
-
-/* ══════════════════════════════════════
-   INIT
-   Waits for data.js to load movies array,
-   then builds all rows from TMDB data
-   ══════════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', buildRows);
